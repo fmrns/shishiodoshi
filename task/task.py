@@ -35,7 +35,6 @@ class Task:
     def __init__(
         self,
         name: str,
-        line: int,
         progress: int,
         plan_start: DateTime,
         plan_end: DateTime,
@@ -44,7 +43,7 @@ class Task:
         now: DateTime,
         breaks: TimeRangeSet,
     ):
-        self.name = f"{name}-line{line}"
+        self.name = name
         self.plan_start = plan_start
         self.plan_end = plan_end
         self.actual_start = actual_start

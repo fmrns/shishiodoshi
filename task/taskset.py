@@ -26,7 +26,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from pendulum import Duration, duration as penduration
+from pendulum import DateTime, Duration, duration as penduration
 from task.task import Task
 
 
@@ -49,6 +49,26 @@ class TaskSet:
 
     def names(self) -> list[str]:
         return [task.name for task in self.tasks]
+
+    def names_responsible(self, on: DateTime) -> list[str]:
+        sorted_tasks = sorted(self.tasks, key=lambda task: task.plan_start)
+        if not sorted_tasks:
+            return []
+        if on < sorted_tasks[0].plan_start:
+            base = sorted_tasks[0].plan_start.at(0)
+        else:
+            base = on.at(0)
+        base_end = base.end_of("day")
+        rc = []
+        for task in sorted_tasks:
+            if task.actual_start is None:
+                if task.plan_start < base_end:
+                    rc.append(task.name)
+            elif task.actual_end is None:
+                rc.append(task.name)
+            elif base <= task.actual_end:
+                rc.append(task.name)
+        return rc
 
     def total_planned_duration(self) -> Duration:
         return sum((t.planned_total_duration for t in self.tasks), penduration())

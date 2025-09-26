@@ -33,7 +33,15 @@ sys.path.insert(0, os.path.dirname(__file__))
 
 import subprocess
 from datetime import datetime as datetime_sucks
-from pendulum import DateTime, datetime, now, duration as penduration, SATURDAY, SUNDAY
+from pendulum import (
+    DateTime,
+    datetime,
+    now,
+    duration as penduration,
+    parse as penparse,
+    SATURDAY,
+    SUNDAY,
+)
 from openpyxl import load_workbook
 
 from timerange import TimeRange, TimeRangeSet
@@ -154,6 +162,7 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
         task_name = row[label_to_col["タスク"]]
         if task_name is None:
             continue
+        task_name += f"-line{i}"
         plan_start = to_datetime(row[label_to_col["予定開始日時"]])
         if plan_start is None:
             continue
@@ -184,7 +193,6 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
             print(f"{task_name}: 恐ろしいことに誰も担当していません。")
         task = Task(
             task_name,
-            i,
             progress,
             plan_start,
             plan_end,
@@ -206,11 +214,58 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
     return taskset
 
 
+def print_progress_details(
+    planned_total,
+    planned_done,
+    actual_done,
+    expected_actual_seconds,
+    note="",
+):
+    planned_progress = planned_done.in_seconds() / planned_total.in_seconds()
+    actual_progress = actual_done.in_seconds() / expected_actual_seconds
+    actual_per_planned = (
+        actual_progress / planned_progress if planned_progress > 0 else -1
+    )
+    print(
+        f"予定進捗率{note}: {100 * planned_progress:.2f}% "
+        f"({planned_done.in_hours()}hr/{planned_total.in_hours()}hr)"
+    )
+    print(
+        f"実績進捗率{note}: {100 * actual_progress:.2f}% "
+        f"({actual_done.in_hours()}hr/{expected_actual_seconds / 3600.0:.0f}hr)"
+    )
+    print(
+        f"実績/予定 {note}: "
+        + (f"{100 * actual_per_planned:.2f}%" if actual_per_planned >= 0 else "N/A")
+        + f" ({100 * actual_progress:.2f}%/{100 * planned_progress:.2f}%)"
+    )
+    print(
+        "コメント  : "
+        + (
+            "がんばります。"
+            if actual_per_planned < 50
+            else "だんだん調子が出てきました。"
+            if actual_per_planned < 90
+            else "順調です。"
+            if actual_per_planned < 120
+            else "順調すぎて怖いです。"
+        )
+    )
+
+
 def main():
     breaks = make_breaks()
-    nowt = now()
 
-    wb = load_workbook("進捗管理表_チーム名.xlsx")
+    if len(sys.argv) > 1:
+        wb = load_workbook(sys.argv[1])
+    else:
+        wb = load_workbook("進捗管理表.xlsx")
+
+    if len(sys.argv) > 2:
+        nowt = penparse(sys.argv[2])
+    else:
+        nowt = now()
+
     ws = wb.active
     baseline, team, members = load_members(ws)
     print(f"基準: {baseline}")
@@ -233,38 +288,61 @@ def main():
     passed_period = max(
         penduration(), nowt.add(days=1).at(0).diff(THE_FIRST_DATE.at(0))
     )
+    team_planned_total = penduration()
+    team_planned_done = penduration()
+    team_actual_done = penduration()
+    team_expected_actual_seconds = 0
     for m in members:
         planned_total, planned_done, actual_done, expected_actual_seconds = (
             m.tasks.total_durations()
         )
-        planned_progress = planned_done.in_seconds() / planned_total.in_seconds()
-        actual_progress = actual_done.in_seconds() / expected_actual_seconds
-        print("=" * 100)
+        team_planned_total += planned_total
+        team_planned_done += planned_done
+        team_actual_done += actual_done
+        team_expected_actual_seconds += expected_actual_seconds
+
+    is_team_shown = False
+    for m in members:
+        print("=" * 80)
         print(f"{m.name}さん")
         print("-" * 50)
         print(f"チーム名  : {team}")
-
-        print(f"担当タスク: {', '.join(m.tasks.names())}")
+        print(f"担当タスク: {', '.join(m.tasks.names_responsible(nowt))}")
         print(f"役割      : {m.role}")
-        print("-" * 50)
         print(f"ベースライン: {baseline}")
         print(
-            f"行程        : {100 * passed_period.in_days() / whole_period.in_days():.2f}% ({passed_period.in_days()}日/{whole_period.in_days()}日)"
+            f"行程      : {100 * passed_period.in_days() / whole_period.in_days():.2f}% "
+            f"({passed_period.in_days()}日/{whole_period.in_days()}日)"
         )
-        print(
-            f"予定進捗率  : {100 * planned_progress:.2f}% ({planned_done.in_hours()}hr/{planned_total.in_hours()}hr)"
+
+        planned_total, planned_done, actual_done, expected_actual_seconds = (
+            m.tasks.total_durations()
         )
-        print(
-            f"実績進捗率  : {100 * actual_progress:.2f}% ({actual_done.in_hours()}hr/{expected_actual_seconds / 3600.0:.0f}hr)"
+        print_progress_details(
+            planned_total,
+            planned_done,
+            actual_done,
+            expected_actual_seconds,
         )
-        print(
-            "実績/予定   : "
-            + (
-                f"{100 * actual_progress / planned_progress:.2f}%"
-                if planned_progress > 0
-                else "N/A"
+        if m.role == "リーダー":
+            is_team_shown = True
+            print("-" * 50)
+            print_progress_details(
+                team_planned_total,
+                team_planned_done,
+                team_actual_done,
+                team_expected_actual_seconds,
+                "(チーム)",
             )
-            + f" ({100 * actual_progress:.2f}%/{100 * planned_progress:.2f}%)"
+
+    if not is_team_shown:
+        print("=" * 80)
+        print_progress_details(
+            team_planned_total,
+            team_planned_done,
+            team_actual_done,
+            team_expected_actual_seconds,
+            "(チーム)",
         )
 
 
