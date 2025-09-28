@@ -555,11 +555,6 @@ def main(xlsx: str = None, nw: str = None):
     if team_tasks:
         gantt(sorted(team_tasks, key=lambda t: t.plan_start), nowtt)
 
-    if IN_GOOGLE_COLAB:
-        from google.colab import runtime
-
-        runtime.unassign()
-
 
 if __name__ == "__main__":
     main()
