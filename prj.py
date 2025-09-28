@@ -384,7 +384,7 @@ def gantt(trs: TaskSet, nowtt: DateTime):
         tickfont=dict(color="white"),
         title_font=dict(color="white"),
     )
-    fig.show()
+    return fig
 
 
 def main(xlsx: str = None, nw: str = None):
@@ -553,7 +553,10 @@ def main(xlsx: str = None, nw: str = None):
         )
 
     if team_tasks:
-        gantt(sorted(team_tasks, key=lambda t: t.plan_start), nowtt)
+        fig = gantt(sorted(team_tasks, key=lambda t: t.plan_start), nowtt)
+        if IN_GOOGLE_COLAB:
+            return fig
+        fig.show()
 
 
 if __name__ == "__main__":
