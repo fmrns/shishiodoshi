@@ -317,8 +317,8 @@ def gantt(trs: TaskSet, nowtt: DateTime):
         df.append(
             dict(
                 Task=t.name + "(予定)",
-                Start=t.plan_start,
-                Finish=t.plan_end,
+                Start=t.plan_start.isoformat(),
+                Finish=t.plan_end.isoformat(),
                 Resource="plan" if t.actual_start else "unstarted",
             )
         )
@@ -326,8 +326,8 @@ def gantt(trs: TaskSet, nowtt: DateTime):
             df.append(
                 dict(
                     Task=t.name,
-                    Start=t.actual_start,
-                    Finish=t.actual_end,
+                    Start=t.actual_start.isoformat(),
+                    Finish=t.actual_end.isoformat(),
                     Resource="done",
                 )
             )
@@ -335,8 +335,8 @@ def gantt(trs: TaskSet, nowtt: DateTime):
             df.append(
                 dict(
                     Task=t.name,
-                    Start=t.actual_start,
-                    Finish=nowtt,
+                    Start=t.actual_start.isoformat(),
+                    Finish=nowtt.isoformat(),
                     Resource="in progress",
                 )
             )
