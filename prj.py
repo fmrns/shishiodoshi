@@ -45,7 +45,7 @@ from pendulum import (
 )
 from openpyxl import load_workbook
 
-from util.text import wljustify
+from util.text import wljustify, TERM_NORM, TERM_RED
 from timerange import TimeRange, TimeRangeSet
 from task import Task, TaskSet
 from member import Member, MemberSet
@@ -209,6 +209,7 @@ def load_tasks(
         # else:
         #    print(f"{label}: 列{label_to_col[label]}")
 
+    print(TERM_RED, end="")
     taskset = TaskSet()
     is_warned = False
     for i, row in enumerate(
@@ -267,6 +268,7 @@ def load_tasks(
             m.add_task(task)
             if m.was_warned:
                 is_warned = True
+    print(TERM_NORM, end="")
     if is_warned:
         print("\n確認したらenterを押してください。")
         input()
@@ -302,9 +304,8 @@ def print_progress_details(
 
 
 def main(xlsx: str = None, nw: str = None):
-    try:
-        import google.colab
-    except ImportError:
+    IN_GOOGLE_COLAB = "google.colab" in sys.modules
+    if not IN_GOOGLE_COLAB:
         if not xlsx and len(sys.argv) > 1:
             xlsx = sys.argv[1]
         if not nw and len(sys.argv) > 2:
@@ -313,8 +314,8 @@ def main(xlsx: str = None, nw: str = None):
         xlsx = "進捗管理表.xlsx"
 
     nowt = penparse(nw, tz=tz_default) if nw else now(tz_default)
+    wb = load_workbook(xlsx, read_only=True, data_only=True)
 
-    wb = load_workbook(xlsx, data_only=True)
     ws = wb.active
     baseline, team, members, on_off_map = load_members(ws)
     print("-" * 50)
@@ -398,7 +399,7 @@ def main(xlsx: str = None, nw: str = None):
 
         actual_per_planned = print_progress_details(*m.tasks.total_durations())
 
-        print("コメント  : ", end="")
+        print("コメント  : " + TERM_RED, end="")
         unstarted_tasks = m.tasks.filter(lambda t: t.is_unstarted(nowtt))
         unfinished_tasks = m.tasks.filter(lambda t: t.is_unfinished(nowtt))
         overrun_tasks = m.tasks.filter(lambda t: t.is_overrun(nowtt))
@@ -439,17 +440,18 @@ def main(xlsx: str = None, nw: str = None):
                 )
             )
         print(
-            "がんばります。"
-            if not actual_per_planned or actual_per_planned < 50
-            else "だんだん調子が出てきました。"
-            if actual_per_planned < 90
-            else "順調です。"
-            if actual_per_planned < 120
-            else "順調すぎて怖いです。"
+            TERM_NORM
+            + (
+                "がんばります。"
+                if not actual_per_planned or actual_per_planned < 50
+                else "だんだん調子が出てきました。"
+                if actual_per_planned < 90
+                else "順調です。"
+                if actual_per_planned < 120
+                else "順調すぎて怖いです。"
+            )
         )
-        try:
-            import google.colab
-        except ImportError:
+        if not IN_GOOGLE_COLAB:
             print("\n確認したらenterを押してください。")
             input()
 

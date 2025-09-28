@@ -28,6 +28,9 @@
 
 from unicodedata import east_asian_width
 
+TERM_NORM = "\033[m"
+TERM_RED = "\033[1;31m"
+
 
 def wlen(s: str) -> int:
     return sum(2 if east_asian_width(c) in "WF" else 1 for c in s)
