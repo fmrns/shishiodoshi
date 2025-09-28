@@ -299,13 +299,17 @@ def print_progress_details(
     )
     print(
         f"実績/予定 {note}: "
-        + (f"{100 * actual_per_planned:.2f}%" if actual_per_planned else "N/A")
+        + (
+            f"{100 * actual_per_planned:.2f}%"
+            if actual_per_planned is not None
+            else "N/A"
+        )
         + f" ({actual_progress:.2f}%/{planned_progress:.2f}%)"
     )
     return actual_per_planned
 
 
-def gantt(trs: TaskSet, nowtt: DateTime):
+def gantt(trs: TaskSet, nowtt: DateTime, title: str):
     colors = {
         "plan": "rgb(100,149,237)",  # 計画  : コーンフラワーブルー
         "done": "rgb(0,255,100)",  # 完了  : 緑
@@ -362,6 +366,7 @@ def gantt(trs: TaskSet, nowtt: DateTime):
         group_tasks=True,
     )
     fig.update_layout(
+        title=f"{title}",
         height=40 * len(df),
         width=(end - start).in_days() * 150,
         plot_bgcolor="black",
@@ -372,6 +377,7 @@ def gantt(trs: TaskSet, nowtt: DateTime):
         showgrid=True,
         gridwidth=1,
         dtick="D1",
+        side="top" if nowtt - start < end - nowtt else "bottom",
         tickformat="%Y-%m-%d",
         gridcolor="gray",
         tickfont=dict(color="white"),
@@ -553,7 +559,9 @@ def main(xlsx: str = None, nw: str = None):
         )
 
     if team_tasks:
-        fig = gantt(sorted(team_tasks, key=lambda t: t.plan_start), nowtt)
+        fig = gantt(
+            sorted(team_tasks, key=lambda t: t.plan_start), nowtt, f"{baseline}: {xlsx}"
+        )
         if IN_GOOGLE_COLAB:
             return fig
         fig.show()
