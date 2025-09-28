@@ -44,6 +44,8 @@ from pendulum import (
     SUNDAY,
 )
 from openpyxl import load_workbook
+import plotly.figure_factory as ff
+
 
 from util.text import wljustify, TERM_NORM, TERM_RED
 from timerange import TimeRange, TimeRangeSet
@@ -303,6 +305,52 @@ def print_progress_details(
     return actual_per_planned
 
 
+def gantt(trs: TaskSet, nowtt: DateTime):
+    colors = {
+        "plan": "rgb(100,149,237)",  # 計画  : コーンフラワーブルー
+        "done": "rgb(0,255,100)",  # 完了  : 緑
+        "in progress": "rgb(255,165,0)",  # 進行中: オレンジ
+        "unstarted": "rgb(220,0,0)",  # 未着手: 赤
+    }
+    df = []
+    for t in trs:
+        df.append(
+            dict(
+                Task=t.name + "(予定)",
+                Start=t.plan_start,
+                Finish=t.plan_end,
+                Resource="plan" if t.actual_start else "unstarted",
+            )
+        )
+        if t.actual_end:
+            df.append(
+                dict(
+                    Task=t.name,
+                    Start=t.actual_start,
+                    Finish=t.actual_end,
+                    Resource="done",
+                )
+            )
+        elif t.actual_start:
+            df.append(
+                dict(
+                    Task=t.name,
+                    Start=t.actual_start,
+                    Finish=nowtt,
+                    Resource="in progress",
+                )
+            )
+    fig = ff.create_gantt(
+        df,
+        index_col="Resource",
+        colors=colors,
+        show_colorbar=True,
+        group_tasks=True,
+    )
+    fig.update_layout(height=40 * len(df))
+    fig.show()
+
+
 def main(xlsx: str = None, nw: str = None):
     IN_GOOGLE_COLAB = "google.colab" in sys.modules
     if not IN_GOOGLE_COLAB:
@@ -337,11 +385,13 @@ def main(xlsx: str = None, nw: str = None):
     #     print(f"予定: {task.plan_start} - {task.plan_end}")
     #     print(f"実績: {task.actual_start} - {task.actual_end}")
 
+    team_tasks = TaskSet()
     team_planned_total_seconds = 0
     team_planned_done_seconds = 0
     team_actual_total_seconds = 0
     team_actual_done_seconds = 0
     for m in members:
+        team_tasks.add_tasks(m.tasks)
         (
             planned_total_seconds,
             planned_done_seconds,
@@ -465,6 +515,8 @@ def main(xlsx: str = None, nw: str = None):
             team_actual_done_seconds,
             "(チーム)",
         )
+
+    gantt(sorted(team_tasks, key=lambda t: t.plan_start), nowtt)
 
 
 if __name__ == "__main__":
