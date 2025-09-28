@@ -372,6 +372,41 @@ def gantt(trs: TaskSet, nowtt: DateTime, title: str):
         plot_bgcolor="black",
         paper_bgcolor="black",
         font=dict(color="white"),
+        annotations=[
+            dict(
+                text=f"{title}",
+                xref="paper",
+                yref="paper",
+                x=0.01,
+                y=0.98,
+                showarrow=False,
+                font=dict(size=18, color="rgba(200,200,200,0.2)"),
+                xanchor="left",
+                yanchor="top",
+            ),
+            dict(
+                text=f"{title}",
+                xref="paper",
+                yref="paper",
+                x=0.5,
+                y=0.5,
+                showarrow=False,
+                font=dict(size=18, color="rgba(200,200,200,0.2)"),
+                xanchor="center",
+                yanchor="middle",
+            ),
+            dict(
+                text=f"{title}",
+                xref="paper",
+                yref="paper",
+                x=0.98,
+                y=0.02,
+                showarrow=False,
+                font=dict(size=18, color="rgba(200,200,200,0.2)"),
+                xanchor="right",
+                yanchor="bottom",
+            ),
+        ],
     )
     fig.update_xaxes(
         showgrid=True,
@@ -560,7 +595,9 @@ def main(xlsx: str = None, nw: str = None):
 
     if team_tasks:
         fig = gantt(
-            sorted(team_tasks, key=lambda t: t.plan_start), nowtt, f"{baseline}: {xlsx}"
+            sorted(team_tasks, key=lambda t: t.plan_start),
+            nowtt,
+            f"{baseline}: {xlsx} - gantt chart - Copyright (c) 2025 Fumiyuki Shimizu",
         )
         if IN_GOOGLE_COLAB:
             return fig
