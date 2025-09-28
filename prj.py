@@ -312,8 +312,14 @@ def gantt(trs: TaskSet, nowtt: DateTime):
         "in progress": "rgb(255,165,0)",  # 進行中: オレンジ
         "unstarted": "rgb(220,0,0)",  # 未着手: 赤
     }
+    start = None
+    end = None
     df = []
     for t in trs:
+        if not start or t.plan_start < start:
+            start = t.plan_start
+        if not end or t.plan_end > end:
+            end = t.plan_end
         df.append(
             dict(
                 Task=t.name + "(予定)",
@@ -323,6 +329,10 @@ def gantt(trs: TaskSet, nowtt: DateTime):
             )
         )
         if t.actual_end:
+            if not start or t.actual_start < start:
+                start = t.actual_start
+            if not end or t.actual_end > end:
+                end = t.actual_end
             df.append(
                 dict(
                     Task=t.name,
@@ -332,6 +342,10 @@ def gantt(trs: TaskSet, nowtt: DateTime):
                 )
             )
         elif t.actual_start:
+            if not start or t.actual_start < start:
+                start = t.actual_start
+            if not end or nowtt > end:
+                end = nowtt
             df.append(
                 dict(
                     Task=t.name,
@@ -347,7 +361,29 @@ def gantt(trs: TaskSet, nowtt: DateTime):
         show_colorbar=True,
         group_tasks=True,
     )
-    fig.update_layout(height=40 * len(df))
+    fig.update_layout(
+        height=40 * len(df),
+        width=(end - start).in_days() * 150,
+        plot_bgcolor="black",
+        paper_bgcolor="black",
+        font=dict(color="white"),
+    )
+    fig.update_xaxes(
+        showgrid=True,
+        gridwidth=1,
+        dtick="D1",
+        tickformat="%Y-%m-%d",
+        gridcolor="gray",
+        tickfont=dict(color="white"),
+        title_font=dict(color="white"),
+    )
+    fig.update_yaxes(
+        showgrid=True,
+        gridwidth=1,
+        gridcolor="gray",
+        tickfont=dict(color="white"),
+        title_font=dict(color="white"),
+    )
     fig.show()
 
 
