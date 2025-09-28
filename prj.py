@@ -313,10 +313,7 @@ def main(xlsx: str = None, nw: str = None):
     if not xlsx:
         xlsx = "進捗管理表.xlsx"
 
-    print(f"{'Google Colab' if IN_GOOGLE_COLAB else 'on-premises'}")
-    print(TERM_RED + "foo bar" + TERM_NORM)
-    print("<span style='color:red'>baz hoge</span>")
-
+    print(f"xlsx:{xlsx}, nw:{nw}{', Google Colab' if IN_GOOGLE_COLAB else ''}")
     nowt = penparse(nw, tz=tz_default) if nw else now(tz_default)
     wb = load_workbook(xlsx, read_only=True, data_only=True)
 

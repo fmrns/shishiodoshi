@@ -28,7 +28,7 @@
 
 from unicodedata import east_asian_width
 
-TERM_NORM = "\033[m"
+TERM_NORM = "\033[0m"
 TERM_RED = "\033[1;31m"
 
 
