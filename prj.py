@@ -310,6 +310,8 @@ def main(xlsx: str = None, nw: str = None):
     print(f"xlsx: {xlsx}")
     wb = load_workbook(xlsx, data_only=True)
 
+    print(f"{', '.join(sys.argv)}")
+
     if nw:
         nowt = penparse(nw, tz=tz_default)
     elif len(sys.argv) > 2:
