@@ -302,23 +302,19 @@ def print_progress_details(
 
 
 def main(xlsx: str = None, nw: str = None):
-    if not xlsx:
-        if len(sys.argv) > 1:
+    try:
+        import google.colab
+    except ImportError:
+        if not xlsx and len(sys.argv) > 1:
             xlsx = sys.argv[1]
-        else:
-            xlsx = "進捗管理表.xlsx"
-    print(f"xlsx: {xlsx}")
+        if not nw and len(sys.argv) > 2:
+            nw = sys.argv[2]
+    if not xlsx:
+        xlsx = "進捗管理表.xlsx"
+
+    nowt = penparse(nw, tz=tz_default) if nw else now(tz_default)
+
     wb = load_workbook(xlsx, data_only=True)
-
-    print(f"{', '.join(sys.argv)}")
-
-    if nw:
-        nowt = penparse(nw, tz=tz_default)
-    elif len(sys.argv) > 2:
-        nowt = penparse(sys.argv[2], tz=tz_default)
-    else:
-        nowt = now(tz_default)
-
     ws = wb.active
     baseline, team, members, on_off_map = load_members(ws)
     print("-" * 50)
