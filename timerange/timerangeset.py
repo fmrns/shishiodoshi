@@ -31,43 +31,43 @@ from pendulum import Duration, duration as penduration
 
 
 class TimeRangeSet:
-    def __init__(self, ranges: list[TimeRange] = []):
-        self.ranges = self._normalize(ranges or [])
+  def __init__(self, ranges: list[TimeRange] = []):
+    self.ranges = self._normalize(ranges or [])
 
-    def add(self, r: TimeRange):
-        self.ranges = self._normalize(self.ranges + [r])
+  def add(self, r: TimeRange):
+    self.ranges = self._normalize(self.ranges + [r])
 
-    def __sub__(self, subtractors: "TimeRangeSet") -> "TimeRangeSet":
-        rc = TimeRangeSet()
-        for r in self.ranges:
-            for s in subtractors:
-                for rr in r - s:
-                    rc.add(rr)
-        return rc
+  def __sub__(self, subtractors: "TimeRangeSet") -> "TimeRangeSet":
+    rc = TimeRangeSet()
+    for r in self.ranges:
+      for s in subtractors:
+        for rr in r - s:
+          rc.add(rr)
+    return rc
 
-    def total_duration(self) -> Duration:
-        return sum((r.duration() for r in self.ranges), penduration())
+  def total_duration(self) -> Duration:
+    return sum((r.duration() for r in self.ranges), penduration())
 
-    def _normalize(self, ranges: list[TimeRange]) -> list[TimeRange]:
-        sorted_ranges = sorted(ranges, key=lambda r: r.start)
-        result = []
-        for r in sorted_ranges:
-            if not result:
-                result.append(r)
-            else:
-                last = result[-1]
-                if last.end >= r.start:
-                    merged = TimeRange(last.start, max(last.end, r.end))
-                    result[-1] = merged
-                else:
-                    result.append(r)
-        return result
+  def _normalize(self, ranges: list[TimeRange]) -> list[TimeRange]:
+    sorted_ranges = sorted(ranges, key=lambda r: r.start)
+    result = []
+    for r in sorted_ranges:
+      if not result:
+        result.append(r)
+      else:
+        last = result[-1]
+        if last.end >= r.start:
+          merged = TimeRange(last.start, max(last.end, r.end))
+          result[-1] = merged
+        else:
+          result.append(r)
+    return result
 
-    def __iter__(self):
-        return iter(self.ranges)
+  def __iter__(self):
+    return iter(self.ranges)
 
-    def __repr__(self):
-        return f"TimeRangeSet({self.ranges})"
+  def __repr__(self):
+    return f"TimeRangeSet({self.ranges})"
 
 
 # end of file

@@ -31,26 +31,28 @@ from task.taskset import TaskSet
 
 
 class Member:
-    def __init__(self, name: str, role: str | None):
-        self.name = name
-        self.role = role
-        self.tasks = TaskSet()
-        self.was_warned = False
+  def __init__(self, name: str, role: str | None):
+    self.name = name
+    self.role = role
+    self.tasks = TaskSet()
+    self.was_warned = False
 
-    def __eq__(self, val: "Member"):
-        return self.name == val.name
+  def __eq__(self, val: "Member"):
+    return self.name == val.name
 
-    def add_task(self, task: "Task"):
-        for ts in self.tasks:
-            if ts.is_overlap(task):
-                self.was_warned = True
-                print(
-                    f"{self.name}さんのタスク「{task.name}」はタスク「{ts.name}」と重なっています。タスクを分割するなどして修正してください。"
-                )
-        self.tasks.add(task)
+  def add_task(self, task: "Task"):
+    for ts in self.tasks:
+      if ts.is_overlap(task):
+        self.was_warned = True
+        print(
+          f"{self.name}さんのタスク「{task.name}」はタスク「{ts.name}」と重なっています。タスクを分割するなどして修正してください。"
+        )
+    self.tasks.add(task)
 
-    def __repr__(self):
-        return f"Member(name={self.name!r}, role={self.role!r}, tasks={len(self.tasks)} tasks)"
+  def __repr__(self):
+    return (
+      f"Member(name={self.name!r}, role={self.role!r}, tasks={len(self.tasks)} tasks)"
+    )
 
 
 # end of file

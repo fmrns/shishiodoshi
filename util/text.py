@@ -33,11 +33,11 @@ TERM_RED = "\033[1;31m"
 
 
 def wlen(s: str) -> int:
-    return sum(2 if east_asian_width(c) in "WF" else 1 for c in s)
+  return sum(2 if east_asian_width(c) in "WF" else 1 for c in s)
 
 
 def wljustify(s: str, wl: int) -> int:
-    return s + " " * (wl - wlen(s))
+  return s + " " * (wl - wlen(s))
 
 
 # end of file

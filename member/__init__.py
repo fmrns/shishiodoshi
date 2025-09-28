@@ -29,6 +29,6 @@
 from member.member import Member
 from member.memberset import MemberSet
 
-__all__ = ['Member', 'MemberSet']
+__all__ = ["Member", "MemberSet"]
 
 # end of file

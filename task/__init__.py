@@ -29,6 +29,6 @@
 from task.task import Task
 from task.taskset import TaskSet
 
-__all__ = ['Task', 'TaskSet']
+__all__ = ["Task", "TaskSet"]
 
 # end of file

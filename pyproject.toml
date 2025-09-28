@@ -1,7 +1,10 @@
 [tool.ruff]
 line-length = 80
+indent-width = 2
+include = ["*.py", "*.ipynb"]
 
 [tool.ruff.format]
 indent-style = "space"
+docstring-code-format = true
 
 # end of file
