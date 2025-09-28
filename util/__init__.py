@@ -26,33 +26,8 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from member.member import Member
+from util.text import wlen, wljustify
 
-
-class MemberSet:
-    def __init__(self, members: list[Member] = None):
-        self.members = members or []
-
-    def add(self, member: Member):
-        if not self.find_by_name(member.name):
-            self.members.append(member)
-
-    def __iter__(self):
-        return iter(self.members)
-
-    def __len__(self):
-        return len(self.members)
-
-    def __getitem__(self, index):
-        return self.members[index]
-
-    def names(self) -> list[str]:
-        return [m.name for m in self.members]
-
-    def find_by_name(self, name: str) -> Member | None:
-        for m in self.members:
-            if m.name == name:
-                return m
-
+__all__ = ["wlen", "wljustify"]
 
 # end of file

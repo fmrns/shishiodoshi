@@ -26,7 +26,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from pendulum import DateTime, Duration
+from pendulum import DateTime, Duration, timezone
 
 
 class TimeRange:
@@ -35,6 +35,11 @@ class TimeRange:
             raise ValueError("start must be before end")
         self.start = start
         self.end = end
+        # TODO: failsafe for now. remove the following after a suitable grace period has passed.
+        if start.tzinfo != timezone("Asia/Tokyo"):
+            raise ValueError(f"tz of start is {start.tzinfo}")
+        if end.tzinfo != timezone("Asia/Tokyo"):
+            raise ValueError(f"tz of end is {end.tzinfo}")
 
     def is_overlap(self, other: "TimeRange") -> bool:
         return self.start < other.end and other.start < self.end

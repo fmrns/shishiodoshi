@@ -36,39 +36,84 @@ from datetime import datetime as datetime_sucks
 from pendulum import (
     DateTime,
     datetime,
+    timezone,
+    set_local_timezone,
     now,
-    duration as penduration,
     parse as penparse,
     SATURDAY,
     SUNDAY,
 )
 from openpyxl import load_workbook
 
+from util.text import wljustify
 from timerange import TimeRange, TimeRangeSet
 from task import Task, TaskSet
 from member import Member, MemberSet
 
-subprocess.run("c:/Windows/System32/mode.com con cp select=65001", shell=True)
-# print(f"sys.stdout.encoding: {sys.stdout.encoding}")
+if os.name == "nt":
+    subprocess.run("c:/Windows/System32/mode.com con cp select=65001", shell=True)
+    # print(f"sys.stdout.encoding: {sys.stdout.encoding}")
 
-THE_FIRST_DATE = datetime(2025, 9, 16)
-THE_LAST_DATE = datetime(2025, 10, 1)
+tz_default = timezone("Asia/Tokyo")
+excel_epoch = datetime(1899, 12, 30, tz=tz_default)
+set_local_timezone(tz_default)
 
 
-def make_breaks():
-    break_start1 = THE_FIRST_DATE.add(days=-1).at(17)
-    break_end1 = THE_FIRST_DATE.at(9)
-    break_start2 = THE_FIRST_DATE.at(12)
-    break_end2 = THE_FIRST_DATE.at(13)
+def to_datetime(val):
+    if val is None:
+        return val
+    if isinstance(val, DateTime):
+        return val
+    if isinstance(val, datetime_sucks):
+        return datetime(
+            val.year,
+            val.month,
+            val.day,
+            val.hour,
+            val.minute,
+            val.second,
+            tz=tz_default,
+        )
+    if isinstance(val, str):
+        try:
+            return datetime.from_format(val, "YYYY-MM-DD HH:mm:ss", tz=tz_default)
+        except Exception:
+            return None
+    if isinstance(val, int):
+        return excel_epoch.add(days=val)
+    return val
 
-    breaks = TimeRangeSet()
-    # 祝日
-    breaks.add(TimeRange(datetime(2025, 9, 23, 0), datetime(2025, 9, 24, 0)))
-    # 平時、土日
-    while break_start1 <= THE_LAST_DATE.add(days=1).at(0):
+
+# O例以降で同じ日時が縦に並んでいる場所の(i+1行j列)を返す
+def find_double_datetime(ws) -> tuple[int, int]:
+    rows = list(ws.iter_rows())
+    # O列 14(0base)
+    for j in range(15 - 1, len(rows[0])):
+        for i in range(len(rows) - 2):
+            c = to_datetime(rows[i][j].value)
+            if isinstance(c, DateTime) and c == to_datetime(rows[i + 1][j].value):
+                return i + 2, j + 1  # 1base
+    return None, None
+
+
+def make_breaks(on_off_map: dict[DateTime, bool]):
+    the_first = min(on_off_map.keys())
+    the_last = max(on_off_map.keys()).add(days=1)
+
+    break_start1 = the_first.add(days=-1).at(17)
+    break_end1 = the_first.at(9)
+    break_start2 = the_first.at(12)
+    break_end2 = the_first.at(13)
+
+    breaks = TimeRangeSet([TimeRange(the_first.add(days=-1).at(0), the_first.at(0))])
+    # # 祝日 -> xlsx
+    # breaks.add(TimeRange(datetime(2025, 12, 31, 0), datetime(2026, 1, 1, 0)))
+    # breaks.add(TimeRange(datetime(2026, 1, 1, 0), datetime(2026, 1, 2, 0)))
+    # breaks.add(TimeRange(datetime(2026, 1, 12, 0), datetime(2026, 1, 13, 0)))
+    while break_start1 < the_last:
         breaks.add(TimeRange(break_start1, break_end1))
         breaks.add(TimeRange(break_start2, break_end2))
-        if break_end1.day_of_week in [SATURDAY, SUNDAY]:
+        if break_end1.at(0) >= the_last or not on_off_map[break_end1.at(0)]:
             breaks.add(TimeRange(break_end1.at(0), break_end1.add(days=1).at(0)))
         break_start1 = break_start1.add(days=1)
         break_end1 = break_end1.add(days=1)
@@ -77,7 +122,7 @@ def make_breaks():
     return breaks
 
 
-def load_members(ws) -> MemberSet:
+def load_members(ws) -> tuple[str, str, MemberSet, dict[DateTime, bool]]:
     labels = [cell.value for cell in ws[1]]
     label_to_col = {label: i for i, label in enumerate(labels, start=1) if label}
 
@@ -86,13 +131,39 @@ def load_members(ws) -> MemberSet:
     team = ws.cell(row=2, column=label_to_col["チーム名"]).value
 
     members = MemberSet()
+    rows = list(ws.iter_rows(min_row=2, max_row=3))
+    names = rows[0]
+    roles = rows[1]
     for i in range(1, 10):
         col = label_to_col.get(f"担当者{i}")
         if col is not None:
-            name = ws.cell(row=2, column=col).value
+            name = names[col - 1].value
             if name is not None:
-                role = ws.cell(row=3, column=col).value or "プログラマ"
+                role = roles[col - 1].value or "プログラマ"
                 members.add(Member(name=name, role=role))
+
+    on_off_map = {}
+    i, j = find_double_datetime(ws)
+    if j is None:
+        errors.append("O列以降にカレンダーが見つかりませんでした。")
+    else:
+        rows = list(ws.iter_rows())
+        i -= 1
+        j -= 1
+        while j < len(rows[0]):
+            c = to_datetime(rows[i][j].value)
+            if not isinstance(c, DateTime):
+                break
+            x = rows[i + 1][j].value
+            on_off_map[c.at(0)] = x in ["開", "月", "火", "水", "木", "金"] or (
+                x not in ["祝", "休", "土", "日"]
+                and c.day_of_week not in [SATURDAY, SUNDAY]
+            )
+            print(
+                f"{c.format('YYYY-MM-DD dddd'):<20}: {'開講' if on_off_map[c.at(0)] else '休講'}"
+            )
+            j += 1
+
     if baseline is None:
         errors.append("ベースラインの定義が見つかりません。しくしく...")
     if team is None:
@@ -102,34 +173,18 @@ def load_members(ws) -> MemberSet:
     if len(errors) > 0:
         raise ValueError(errors)
 
-    return baseline, team, members
+    return baseline, team, members, on_off_map
 
 
-def to_datetime(val):
-    if val is None:
-        return val
-    if isinstance(val, DateTime):
-        return val
-    if isinstance(val, str):
-        try:
-            return datetime.from_format(val, "YYYY-MM-DD HH:mm:ss")
-        except Exception:
-            return None
-    if isinstance(val, datetime_sucks):
-        return datetime(
-            val.year,
-            val.month,
-            val.day,
-            val.hour,
-            val.minute,
-            val.second,
-        )
-    return val
-
-
-def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> TaskSet:
+def load_tasks(
+    ws,
+    members: MemberSet,
+    now: DateTime,
+    breaks: TimeRangeSet,
+    on_off_map: dict[DateTime, bool],
+) -> TaskSet:
     labels = None
-    for row in ws.iter_rows(min_row=5, max_row=ws.max_row, values_only=True):
+    for row in ws.iter_rows(min_row=5, values_only=True):
         if "タスク" in row:
             labels = list(row)
             break
@@ -157,7 +212,8 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
     taskset = TaskSet()
     is_warned = False
     for i, row in enumerate(
-        ws.iter_rows(min_row=6, max_row=ws.max_row, values_only=True), start=6
+        ws.iter_rows(min_row=6, values_only=True),
+        start=6,
     ):
         task_name = row[label_to_col["タスク"]]
         if task_name is None:
@@ -168,11 +224,13 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
             continue
         plan_end = to_datetime(row[label_to_col["予定完了日時"]])
         if plan_end is None:
+            is_warned = True
             print(f"{task_name}: 予定完了日時がありません。")
+            continue
         try:
             progress = int(row[label_to_col["進捗(%)"]])
         except (TypeError, ValueError):
-            progress = -1
+            progress = None
         actual_start = to_datetime(row[label_to_col["実績開始日時"]])
         actual_end = to_datetime(row[label_to_col["実績完了日時"]])
         task_members = MemberSet()
@@ -200,6 +258,7 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
             actual_end,
             now,
             breaks,
+            on_off_map,
         )
         if task.was_warned:
             is_warned = True
@@ -215,59 +274,52 @@ def load_tasks(ws, members: MemberSet, breaks: TimeRangeSet, now: DateTime) -> T
 
 
 def print_progress_details(
-    planned_total,
-    planned_done,
-    actual_done,
-    expected_actual_seconds,
+    planned_total_seconds,
+    planned_done_seconds,
+    actual_total_seconds,
+    actual_done_seconds,
     note="",
-):
-    planned_progress = planned_done.in_seconds() / planned_total.in_seconds()
-    actual_progress = actual_done.in_seconds() / expected_actual_seconds
+) -> float:
+    planned_progress = 100 * planned_done_seconds / planned_total_seconds
+    actual_progress = 100 * actual_done_seconds / actual_total_seconds
     actual_per_planned = (
-        actual_progress / planned_progress if planned_progress > 0 else -1
+        actual_progress / planned_progress if planned_progress > 0 else None
     )
     print(
-        f"予定進捗率{note}: {100 * planned_progress:.2f}% "
-        f"({planned_done.in_hours()}hr/{planned_total.in_hours()}hr)"
+        f"予定進捗率{note}: {planned_progress:.2f}% "
+        f"({planned_done_seconds / 3600:.2f}hr/{planned_total_seconds / 3600:.2f}hr)"
     )
     print(
-        f"実績進捗率{note}: {100 * actual_progress:.2f}% "
-        f"({actual_done.in_hours()}hr/{expected_actual_seconds / 3600.0:.0f}hr)"
+        f"実績進捗率{note}: {actual_progress:.2f}% "
+        f"({actual_done_seconds / 3600:.2f}hr/{actual_total_seconds / 3600:.2f}hr)"
     )
     print(
         f"実績/予定 {note}: "
-        + (f"{100 * actual_per_planned:.2f}%" if actual_per_planned >= 0 else "N/A")
-        + f" ({100 * actual_progress:.2f}%/{100 * planned_progress:.2f}%)"
+        + (f"{100 * actual_per_planned:.2f}%" if actual_per_planned else "N/A")
+        + f" ({actual_progress:.2f}%/{planned_progress:.2f}%)"
     )
-    print(
-        "コメント  : "
-        + (
-            "がんばります。"
-            if actual_per_planned < 50
-            else "だんだん調子が出てきました。"
-            if actual_per_planned < 90
-            else "順調です。"
-            if actual_per_planned < 120
-            else "順調すぎて怖いです。"
-        )
-    )
+    return actual_per_planned
 
 
-def main():
-    breaks = make_breaks()
+def main(xlsx: str = None, nw: str = None):
+    if not xlsx:
+        if len(sys.argv) > 1:
+            xlsx = sys.argv[1]
+        else:
+            xlsx = "進捗管理表.xlsx"
+    print(f"xlsx: {xlsx}")
+    wb = load_workbook(xlsx, data_only=True)
 
-    if len(sys.argv) > 1:
-        wb = load_workbook(sys.argv[1])
+    if nw:
+        nowt = penparse(nw, tz=tz_default)
+    elif len(sys.argv) > 2:
+        nowt = penparse(sys.argv[2], tz=tz_default)
     else:
-        wb = load_workbook("進捗管理表.xlsx")
-
-    if len(sys.argv) > 2:
-        nowt = penparse(sys.argv[2])
-    else:
-        nowt = now()
+        nowt = now(tz_default)
 
     ws = wb.active
-    baseline, team, members = load_members(ws)
+    baseline, team, members, on_off_map = load_members(ws)
+    print("-" * 50)
     print(f"基準: {baseline}")
     print(f"チーム名: {team}")
     for m in members:
@@ -276,7 +328,8 @@ def main():
         print(f"役割: {m.role}")
     print("-" * 50)
 
-    load_tasks(ws, members, breaks, nowt)
+    breaks = make_breaks(on_off_map)
+    load_tasks(ws, members, nowt, breaks, on_off_map)
     # for task in tasks:
     #     print("-" * 50)
     #     print(f"タスク: {task.name}")
@@ -284,64 +337,128 @@ def main():
     #     print(f"予定: {task.plan_start} - {task.plan_end}")
     #     print(f"実績: {task.actual_start} - {task.actual_end}")
 
-    whole_period = THE_LAST_DATE.add(days=1).at(0).diff(THE_FIRST_DATE.at(0))
-    passed_period = max(
-        penduration(), nowt.add(days=1).at(0).diff(THE_FIRST_DATE.at(0))
-    )
-    team_planned_total = penduration()
-    team_planned_done = penduration()
-    team_actual_done = penduration()
-    team_expected_actual_seconds = 0
+    team_planned_total_seconds = 0
+    team_planned_done_seconds = 0
+    team_actual_total_seconds = 0
+    team_actual_done_seconds = 0
     for m in members:
-        planned_total, planned_done, actual_done, expected_actual_seconds = (
-            m.tasks.total_durations()
-        )
-        team_planned_total += planned_total
-        team_planned_done += planned_done
-        team_actual_done += actual_done
-        team_expected_actual_seconds += expected_actual_seconds
+        (
+            planned_total_seconds,
+            planned_done_seconds,
+            actual_total_seconds,
+            actual_done_seconds,
+        ) = m.tasks.total_durations()
+        team_planned_total_seconds += planned_total_seconds
+        team_planned_done_seconds += planned_done_seconds
+        team_actual_total_seconds += actual_total_seconds
+        team_actual_done_seconds += actual_done_seconds
 
     is_team_shown = False
     for m in members:
+        base_start, base_end = m.tasks.calc_base(nowt)
+        nowtt = max(base_start, nowt)
+        now_days = 0
+        period_days = 0
+        dt = m.tasks.period_start.at(0)
+        while dt < m.tasks.period_end.add(days=1).at(0):
+            if on_off_map[dt]:
+                period_days += 1
+                if dt <= base_start:
+                    now_days += 1
+            dt = dt.add(days=1)
         print("=" * 80)
-        print(f"{m.name}さん")
+        print(f"{m.name}さん CS(1)")
         print("-" * 50)
         print(f"チーム名  : {team}")
-        print(f"担当タスク: {', '.join(m.tasks.names_responsible(nowt))}")
+        assigned_tasks = m.tasks.filter(lambda t: t.is_responsible(base_start))
+        print(
+            f"担当タスク: {', '.join(assigned_tasks.names()) if assigned_tasks else 'ありません。まじか、しくしく...'}"
+        )
         print(f"役割      : {m.role}")
+        print("-" * 50)
+        print(f"{m.name}さん CS(2)")
+        print("-" * 50)
         print(f"ベースライン: {baseline}")
         print(
-            f"行程      : {100 * passed_period.in_days() / whole_period.in_days():.2f}% "
-            f"({passed_period.in_days()}日/{whole_period.in_days()}日)"
+            f"行程      : {100 * now_days / period_days:.2f}% ({now_days}日/{period_days}日 "
+            + f"{nowt.format('YYYY-MM-DD HH:mmZ')}/"
+            + f"{m.tasks.period_start.format('YYYY-MM-DD HH:mmZ')}/"
+            + f"{m.tasks.period_end.format('YYYY-MM-DD HH:mmZ')})"
         )
 
-        planned_total, planned_done, actual_done, expected_actual_seconds = (
-            m.tasks.total_durations()
-        )
-        print_progress_details(
-            planned_total,
-            planned_done,
-            actual_done,
-            expected_actual_seconds,
-        )
         if m.role == "リーダー":
             is_team_shown = True
             print("-" * 50)
             print_progress_details(
-                team_planned_total,
-                team_planned_done,
-                team_actual_done,
-                team_expected_actual_seconds,
+                team_planned_total_seconds,
+                team_planned_done_seconds,
+                team_actual_total_seconds,
+                team_actual_done_seconds,
                 "(チーム)",
             )
+            print("-" * 50)
+
+        actual_per_planned = print_progress_details(*m.tasks.total_durations())
+
+        print("コメント  : ", end="")
+        unstarted_tasks = m.tasks.filter(lambda t: t.is_unstarted(nowtt))
+        unfinished_tasks = m.tasks.filter(lambda t: t.is_unfinished(nowtt))
+        overrun_tasks = m.tasks.filter(lambda t: t.is_overrun(nowtt))
+        if unstarted_tasks or unfinished_tasks or overrun_tasks:
+            print("")
+        if unstarted_tasks:
+            print("☆ タスクが開始されていません:")
+            print(
+                "   "
+                + "\n   ".join(
+                    wljustify(f"{t.name}", unstarted_tasks.max_len_of_names)
+                    + f" 予定開始日時: {t.plan_start.format('YYYY-MM-DD HH:mmZ')}"
+                    + f" <= {nowtt.format('YYYY-MM-DD HH:mmZ')}"
+                    for t in unstarted_tasks
+                )
+            )
+        if unfinished_tasks:
+            print("☆ タスクが完了していません:")
+            print(
+                "   "
+                + "\n   ".join(
+                    wljustify(f"{t.name}", unfinished_tasks.max_len_of_names)
+                    + f" 予定終了日時: {t.plan_end.format('YYYY-MM-DD HH:mmZ')}"
+                    + f" <= {nowtt.format('YYYY-MM-DD HH:mmZ')}"
+                    for t in unfinished_tasks
+                )
+            )
+        if overrun_tasks:
+            print("☆ 工数が超過しています:")
+            print(
+                "   "
+                + "\n   ".join(
+                    wljustify(f"{t.name}", overrun_tasks.max_len_of_names)
+                    + f" 実績工数: {(nowt - t.actual_start).in_minutes() / 60:.2f}hr"
+                    + f" ({nowt.format('YYYY-MM-DD HH:mmZ')} / {t.actual_start.format('YYYY-MM-DD HH:mmZ')})"
+                    + f" 予定工数: {(t.plan_end - t.plan_start).in_minutes() / 60:.2f}hr"
+                    for t in overrun_tasks
+                )
+            )
+        print(
+            "がんばります。"
+            if not actual_per_planned or actual_per_planned < 50
+            else "だんだん調子が出てきました。"
+            if actual_per_planned < 90
+            else "順調です。"
+            if actual_per_planned < 120
+            else "順調すぎて怖いです。"
+        )
+        print("\n確認したらenterを押してください。")
+        input()
 
     if not is_team_shown:
         print("=" * 80)
         print_progress_details(
-            team_planned_total,
-            team_planned_done,
-            team_actual_done,
-            team_expected_actual_seconds,
+            team_planned_total_seconds,
+            team_planned_done_seconds,
+            team_actual_total_seconds,
+            team_actual_done_seconds,
             "(チーム)",
         )
 

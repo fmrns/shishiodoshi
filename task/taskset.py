@@ -26,17 +26,40 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from typing import Callable
 from pendulum import DateTime, Duration, duration as penduration
+from util.text import wlen
 from task.task import Task
 
 
 class TaskSet:
     def __init__(self, tasks: list[Task] = None):
         self.tasks = tasks or []
+        if self.tasks:
+            self.period_start = min(t.period_start() for t in self.tasks)
+            self.period_end = max(t.period_end() for t in self.tasks)
+            self.max_len_of_names = max(wlen(t.name) for t in self.tasks)
+        else:
+            self.period_start = None
+            self.period_end = None
+            self.max_len_of_names = None
 
     def add(self, task: Task):
         if task not in self.tasks:
             self.tasks.append(task)
+            ltn = wlen(task.name)
+            if not self.max_len_of_names or self.max_len_of_names < ltn:
+                self.max_len_of_names = ltn
+            tps = task.period_start()
+            tpe = task.period_end()
+            if not self.period_start or self.period_start > tps:
+                self.period_start = tps
+            if not self.period_end or self.period_end < tpe:
+                self.period_end = tpe
+
+    def add_tasks(self, ts: "TaskSet"):
+        for t in ts:
+            self.add(t)
 
     def __iter__(self):
         return iter(self.tasks)
@@ -50,49 +73,34 @@ class TaskSet:
     def names(self) -> list[str]:
         return [task.name for task in self.tasks]
 
-    def names_responsible(self, on: DateTime) -> list[str]:
-        sorted_tasks = sorted(self.tasks, key=lambda task: task.plan_start)
-        if not sorted_tasks:
-            return []
-        if on < sorted_tasks[0].plan_start:
-            base = sorted_tasks[0].plan_start.at(0)
+    def filter(self, pred: Callable[[Task], bool]) -> "TaskSet":
+        return TaskSet([t for t in self.tasks if pred(t)])
+
+    def calc_base(self, base_date: DateTime) -> tuple["DateTime", "DateTime"]:
+        if not self.period_start or self.period_start <= base_date <= self.period_end:
+            rc = base_date.at(0)
+        elif self.period_end < base_date:
+            rc = self.period_end.at(0)
         else:
-            base = on.at(0)
-        base_end = base.end_of("day")
-        rc = []
-        for task in sorted_tasks:
-            if task.actual_start is None:
-                if task.plan_start < base_end:
-                    rc.append(task.name)
-            elif task.actual_end is None:
-                rc.append(task.name)
-            elif base <= task.actual_end:
-                rc.append(task.name)
-        return rc
-
-    def total_planned_duration(self) -> Duration:
-        return sum((t.planned_total_duration for t in self.tasks), penduration())
-
-    def total_planned_done_duration(self) -> Duration:
-        return sum((t.planned_done_duration for t in self.tasks), penduration())
-
-    def total_actual_done_duration(self) -> Duration:
-        return sum((t.actual_done_duration for t in self.tasks), penduration())
-
-    def total_expected_actual_seconds(self) -> float:
-        return sum(t.expected_actual_total_seconds for t in self.tasks)
+            rc = self.period_start.at(0)
+        return rc, rc.add(days=1)
 
     def total_durations(self) -> tuple[Duration, Duration, Duration, float]:
-        planned_total = penduration()
-        planned_done = penduration()
-        actual_done = penduration()
-        expected_actual_seconds = 0.0
+        planned_total_seconds = 0
+        planned_done_seconds = 0
+        actual_total_seconds = 0
+        actual_done_seconds = 0
         for t in self.tasks:
-            planned_total += t.planned_total_duration
-            planned_done += t.planned_done_duration
-            actual_done += t.actual_done_duration
-            expected_actual_seconds += t.expected_actual_total_seconds
-        return planned_total, planned_done, actual_done, expected_actual_seconds
+            planned_total_seconds += t.planned_total_seconds
+            planned_done_seconds += t.planned_done_seconds
+            actual_total_seconds += t.actual_total_seconds
+            actual_done_seconds += t.actual_done_seconds
+        return (
+            planned_total_seconds,
+            planned_done_seconds,
+            actual_total_seconds,
+            actual_done_seconds,
+        )
 
 
 # end of file
