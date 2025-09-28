@@ -447,8 +447,11 @@ def main(xlsx: str = None, nw: str = None):
             if actual_per_planned < 120
             else "順調すぎて怖いです。"
         )
-        print("\n確認したらenterを押してください。")
-        input()
+        try:
+            import google.colab
+        except ImportError:
+            print("\n確認したらenterを押してください。")
+            input()
 
     if not is_team_shown:
         print("=" * 80)
