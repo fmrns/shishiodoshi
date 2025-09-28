@@ -26,7 +26,9 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from pendulum import DateTime, duration as penduration
+from pendulum import DateTime
+from pendulum import duration as penduration
+
 from timerange.timerange import TimeRange
 from timerange.timerangeset import TimeRangeSet
 

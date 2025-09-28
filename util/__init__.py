@@ -26,7 +26,7 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from util.text import wlen, wljustify, TERM_NORM, TERM_RED
+from util.text import TERM_NORM, TERM_RED, wlen, wljustify
 
 __all__ = ["wlen", "wljustify", "TERM_NORM", "TERM_RED"]
 

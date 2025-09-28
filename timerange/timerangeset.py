@@ -26,8 +26,10 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from pendulum import Duration
+from pendulum import duration as penduration
+
 from timerange.timerange import TimeRange
-from pendulum import Duration, duration as penduration
 
 
 class TimeRangeSet:

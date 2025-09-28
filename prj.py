@@ -26,31 +26,33 @@
 # CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import sys
 import os
+import sys
 
 sys.path.insert(0, os.path.dirname(__file__))
 
 import subprocess
 from datetime import datetime as datetime_sucks
+
+import plotly.figure_factory as ff
+from openpyxl import load_workbook
 from pendulum import (
-  DateTime,
-  datetime,
-  timezone,
-  set_local_timezone,
-  now,
-  parse as penparse,
   SATURDAY,
   SUNDAY,
+  DateTime,
+  datetime,
+  now,
+  set_local_timezone,
+  timezone,
 )
-from openpyxl import load_workbook
-import plotly.figure_factory as ff
+from pendulum import (
+  parse as penparse,
+)
 
-
-from util.text import wljustify, TERM_NORM, TERM_RED
-from timerange import TimeRange, TimeRangeSet
-from task import Task, TaskSet
 from member import Member, MemberSet
+from task import Task, TaskSet
+from timerange import TimeRange, TimeRangeSet
+from util.text import TERM_NORM, TERM_RED, wljustify
 
 if os.name == "nt":
   subprocess.run("c:/Windows/System32/mode.com con cp select=65001", shell=True)

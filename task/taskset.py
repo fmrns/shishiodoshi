@@ -27,9 +27,11 @@
 # SOFTWARE.
 
 from typing import Callable
-from pendulum import DateTime, Duration, duration as penduration
-from util.text import wlen
+
+from pendulum import DateTime, Duration
+
 from task.task import Task
+from util.text import wlen
 
 
 class TaskSet:
