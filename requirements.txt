@@ -1,0 +1,4 @@
+openpyxl
+pendulum
+plotly
+numpy

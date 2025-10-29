@@ -58,6 +58,8 @@ if os.name == "nt":
   subprocess.run("c:/Windows/System32/mode.com con cp select=65001", shell=True)
   # print(f"sys.stdout.encoding: {sys.stdout.encoding}")
 
+IN_GOOGLE_COLAB = "google.colab" in sys.modules
+
 tz_default = timezone("Asia/Tokyo")
 excel_epoch = datetime(1899, 12, 30, tz=tz_default)
 set_local_timezone(tz_default)
@@ -270,7 +272,7 @@ def load_tasks(
       if m.was_warned:
         is_warned = True
   print(TERM_NORM, end="")
-  if is_warned:
+  if is_warned and not IN_GOOGLE_COLAB:
     print("\n確認したらenterを押してください。")
     input()
   return taskset
@@ -424,7 +426,6 @@ def gantt(trs: TaskSet, nowtt: DateTime, title: str):
 
 
 def main(xlsx: str = None, nw: str = None):
-  IN_GOOGLE_COLAB = "google.colab" in sys.modules
   if not IN_GOOGLE_COLAB:
     if not xlsx and len(sys.argv) > 1:
       xlsx = sys.argv[1]
